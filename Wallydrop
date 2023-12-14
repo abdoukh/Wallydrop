@@ -1,0 +1,102 @@
+
+
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:ai_image_painter/ai_image_painter.dart';
+
+void main() => runApp(MyApp());
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Weather-Based AI Wallpaper Changer',
+      home: MyHomePage(),
+    );
+  }
+}
+
+class MyHomePage extends StatefulWidget {
+  @override
+  _MyHomePageState createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  String _currentWeather = "";
+  String _currentImageUrl = "";
+
+  void _updateWeather() async {
+    Position position = await Geolocator().getCurrentPosition();
+    double latitude = position.latitude;
+    double longitude = position.longitude;
+
+    var url = Uri.parse('https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=YOUR_API_KEY&units=metric');
+    var response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      var jsonData = jsonDecode(response.body);
+      var weatherData = jsonData['weather'][0];
+
+      setState(() {
+        _currentWeather = weatherData['main'];
+      });
+
+      // Use the current weather to generate an appropriate AI-generated image
+      var imageData = await generateAIImage(_currentWeather);
+
+      // Use the generated image data to set the wallpaper
+      setState(() {
+        _currentImageUrl = imageData;
+      });
+    }
+  }
+
+  Future<Uint8List> generateAIImage(String weather) async {
+    // Replace with your preferred AI image generation API
+    var url = Uri.parse('https://api.pixelart.ai/v1/images?text=$weather');
+    var response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      var jsonData = jsonDecode(response.body);
+      var imageData = base64Decode(jsonData['image']);
+
+      return imageData;
+    } else {
+      throw Exception('Failed to generate AI image');
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _updateWeather();
+
+    // Schedule a repeating task to update the wallpaper every hour
+    Timer.periodic(Duration(hours: 1), (timer) {
+      _updateWeather();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Weather-Based AI Wallpaper Changer'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Current Weather: $_currentWeather'),
+            SizedBox(height: 20),
+            Image.memory(base64Decode(_currentImageUrl!), height: 300),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
